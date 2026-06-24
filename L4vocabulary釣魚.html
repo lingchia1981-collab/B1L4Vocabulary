@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #e0f7fa;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 900px;
+            height: 550px;
+            background: linear-gradient(135deg, #29b6f6, #0288d1, #01579b);
+            background-size: 400% 400%;
+            animation: waterFlow 12s ease infinite;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+            border: 4px solid #fff;
+        }
+
+        @keyframes waterFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        #game-container::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(transparent, rgba(255,255,255,0.1), transparent);
+            transform: translateY(-100%);
+            animation: ripple 6s linear infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        @keyframes ripple {
+            0% { transform: translateY(-100%) skewY(-5deg); }
+            100% { transform: translateY(100%) skewY(-5deg); }
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        #question-box {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 25px;
+            border-radius: 30px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+
+        #pinyin-target {
+            font-size: 36px;
+            font-weight: bold;
+            color: #d32f2f;
+        }
+
+        #stats-box {
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 18px;
+            display: flex;
+            gap: 20px;
+        }
+
+        #timer {
+            font-weight: bold;
+            color: #ffeb3b;
+        }
+
+        /* 魚隻主體容器 */
+        .fish {
+            position: absolute;
+            width: 170px;
+            height: 110px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 5;
+            --dir: 1; /* 1 代表向左游，-1 代表向右游 */
+        }
+
+        /* 流線型魚身體 */
+        .fish-body {
+            position: absolute;
+            width: 130px;
+            height: 75px;
+            border-radius: 55% 45% 45% 55% / 60% 60% 40% 40%;
+            box-shadow: inset -15px -10px 20px rgba(0,0,0,0.25), 0 5px 12px rgba(0,0,0,0.2);
+            z-index: 5;
+            transition: border-radius 0.2s;
+        }
+
+        /* 當向右遊時，身體形狀對調以符合流線型 */
+        .fish[style*="--dir: -1"] .fish-body {
+            border-radius: 45% 55% 55% 45% / 60% 60% 40% 40%;
+        }
+
+        /* 尾鰭 */
+        .fish-tail {
+            position: absolute;
+            top: 20px;
+            width: 0;
+            height: 0;
+            border-top: 35px solid transparent;
+            border-bottom: 35px solid transparent;
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.15));
+            z-index: 4;
+        }
+        .fish[style*="--dir: 1"] .fish-tail {
+            right: 0px;
+            left: auto;
+            border-right: 45px solid var(--fish-color);
+            border-left: none;
+        }
+        .fish[style*="--dir: -1"] .fish-tail {
+            left: 0px;
+            right: auto;
+            border-left: 45px solid var(--fish-color);
+            border-right: none;
+        }
+
+        /* 超大可愛水汪汪魚眼 */
+        .fish-eye {
+            position: absolute;
+            top: 22px; 
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            z-index: 7;
+            border: 2px solid #222;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+        }
+        .fish-eye::before {
+            content: '';
+            position: absolute;
+            left: 4px;
+            top: 4px;
+            width: 14px;
+            height: 14px;
+            background: #111;
+            border-radius: 50%;
+        }
+        .fish-eye::after {
+            content: '';
+            position: absolute;
+            left: 6px;
+            top: 6px;
+            width: 5px;
+            height: 5px;
+            background: white;
+            border-radius: 50%;
+        }
+        .fish[style*="--dir: 1"] .fish-eye {
+            left: 15px;
+            right: auto;
+        }
+        .fish[style*="--dir: -1"] .fish-eye {
+            right: 15px;
+            left: auto;
+        }
+
+        /* 背鰭 */
+        .fish-fin-top {
+            position: absolute;
+            top: 13px; 
+            width: 55px;
+            height: 15px;
+            border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+            background: var(--fish-color);
+            z-index: 4;
+            transition: transform 0.2s, left 0.2s;
+        }
+        .fish[style*="--dir: 1"] .fish-fin-top {
+            transform: scaleX(-1);
+            left: 45px; 
+        }
+        .fish[style*="--dir: -1"] .fish-fin-top {
+            transform: scaleX(1);
+            left: 65px;
+        }
+
+        /* 腹鰭 */
+        .fish-fin-bottom {
+            position: absolute;
+            bottom: 13px; 
+            width: 45px;
+            height: 12px;
+            border-radius: 0 0 50% 50% / 0 0 100% 100%;
+            background: var(--fish-color);
+            z-index: 4;
+            transition: transform 0.2s, left 0.2s;
+        }
+        .fish[style*="--dir: 1"] .fish-fin-bottom {
+            transform: scaleX(-1);
+            left: 50px;
+        }
+        .fish[style*="--dir: -1"] .fish-fin-bottom {
+            transform: scaleX(1);
+            left: 70px;
+        }
+
+        /* 色彩設定 */
+        .fish-orange { --fish-color: #e64a19; }
+        .fish-orange .fish-body { background: linear-gradient(to bottom, #ff8a65, #e64a19); }
+
+        .fish-yellow { --fish-color: #fbc02d; }
+        .fish-yellow .fish-body { background: linear-gradient(to bottom, #fff176, #fbc02d); }
+
+        .fish-teal { --fish-color: #00796b; }
+        .fish-teal .fish-body { background: linear-gradient(to bottom, #4db6ac, #00796b); }
+
+        .fish-purple { --fish-color: #7b1fa2; }
+        .fish-purple .fish-body { background: linear-gradient(to bottom, #ba68c8, #7b1fa2); }
+
+        /* 中文字體定位 */
+        .fish-text {
+            position: absolute;
+            font-size: 26px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.9);
+            z-index: 8;
+            width: 80px;
+            text-align: center;
+        }
+        .fish[style*="--dir: 1"] .fish-text { transform: translateX(12px); }
+        .fish[style*="--dir: -1"] .fish-text { transform: translateX(-12px); }
+
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(1, 22, 39, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            color: white;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #review-container {
+            width: 85%;
+            max-height: 240px;
+            overflow-y: auto;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            margin: 15px 0 25px 0;
+            padding: 10px;
+        }
+
+        .review-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 16px;
+        }
+        .txt-wrong { color: #ff8a80; font-weight: bold; }
+        .txt-correct { color: #b9f6ca; font-weight: bold; }
+
+        button {
+            background: #00e676;
+            color: #004d40;
+            border: none;
+            padding: 12px 40px;
+            font-size: 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            transition: 0.2s;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #69f0ae;
+            transform: scale(1.05);
+        }
+
+        .hide { display: none !important; }
+
+        #feedback {
+            position: absolute;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 54px;
+            font-weight: bold;
+            z-index: 15;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+        .correct { color: #69f0ae; text-shadow: 0 0 15px #000; }
+        .wrong { color: #ff5252; text-shadow: 0 0 15px #000; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="ui-layer">
+        <div id="question-box">
+            <div style="font-size: 14px; color: #555; font-weight: bold;">Progress: <span id="progress">0</span> / 14</div>
+            <div id="pinyin-target">-</div>
+        </div>
+        <div id="stats-box">
+            <div>Timer: <span id="timer">10</span>s</div>
+            <div>Score: <span id="score">0</span></div>
+        </div>
+    </div>
+
+    <div id="feedback"></div>
+
+    <div class="fish fish-orange" id="fish-0">
+        <div class="fish-fin-top"></div>
+        <div class="fish-body"></div>
+        <div class="fish-eye"></div>
+        <div class="fish-tail"></div>
+        <span class="fish-text"></span>
+        <div class="fish-fin-bottom"></div>
+    </div>
+    <div class="fish fish-yellow" id="fish-1">
+        <div class="fish-fin-top"></div>
+        <div class="fish-body"></div>
+        <div class="fish-eye"></div>
+        <div class="fish-tail"></div>
+        <span class="fish-text"></span>
+        <div class="fish-fin-bottom"></div>
+    </div>
+    <div class="fish fish-teal" id="fish-2">
+        <div class="fish-fin-top"></div>
+        <div class="fish-body"></div>
+        <div class="fish-eye"></div>
+        <div class="fish-tail"></div>
+        <span class="fish-text"></span>
+        <div class="fish-fin-bottom"></div>
+    </div>
+    <div class="fish fish-purple" id="fish-3">
+        <div class="fish-fin-top"></div>
+        <div class="fish-body"></div>
+        <div class="fish-eye"></div>
+        <div class="fish-tail"></div>
+        <span class="fish-text"></span>
+        <div class="fish-fin-bottom"></div>
+    </div>
+
+    <div id="start-screen">
+        <h1 style="color: #4fc3f7; margin-bottom: 10px;">Pinyin Fishing Game</h1>
+        <p style="font-size: 18px; margin-bottom: 30px; color: #e0f7fa;">Test all 14 words! 10 seconds per round. Keep going until the end!</p>
+        <button onclick="startGame()">Start Game</button>
+    </div>
+
+    <div id="game-over-screen" class="hide">
+        <h2 style="color: #4fc3f7; margin: 5px 0;">Game Completed!</h2>
+        <p style="font-size: 24px; margin: 5px 0;">Final Score: <span id="final-score" style="color:#ffd700; font-weight:bold;">0</span> / 140</p>
+        
+        <h3 style="margin: 15px 0 5px 0; color: #e0f7fa;">Review / Corrections:</h3>
+        <div id="review-container"></div>
+
+        <button onclick="startGame()">Play Again</button>
+    </div>
+</div>
+
+<script>
+    const pool = [
+        { zh: "一共", py: "yígòng" },
+        { zh: "錢", py: "qián" },
+        { zh: "買", py: "mǎi" },
+        { zh: "杯", py: "bēi" },
+        { zh: "熱", py: "rè" },
+        { zh: "幫", py: "bāng" },
+        { zh: "微波", py: "wéibō" },
+        { zh: "塊", py: "kuài" },
+        { zh: "支", py: "zhī" },
+        { zh: "舊", py: "jiù" },
+        { zh: "貴", py: "guì" },
+        { zh: "賣", py: "mài" },
+        { zh: "便宜", py: "piányi" },
+        { zh: "萬", py: "wàn" }
+    ];
+
+    let score = 0;
+    let timeLeft = 10; // 修改為 10 秒
+    let timerInterval;
+    let gameActive = false;
+    let currentCorrectAnswer = null;
+    let fishData = [];
+    let wrongAnswersLog = [];
+    
+    let questionQueue = [];
+    let currentRoundIndex = 0;
+
+    const fishElements = [
+        document.getElementById('fish-0'),
+        document.getElementById('fish-1'),
+        document.getElementById('fish-2'),
+        document.getElementById('fish-3')
+    ];
+
+    function initFish() {
+        fishData = fishElements.map((el) => {
+            return {
+                el: el,
+                x: Math.random() * 650,
+                y: 130 + Math.random() * 260,
+                speedX: (Math.random() * 0.6 + 1.2) * (Math.random() > 0.5 ? 1 : -1),
+                speedY: (Math.random() * 0.3 + 0.2) * (Math.random() > 0.5 ? 1 : -1),
+                radius: 65,
+                word: ""
+            };
+        });
+    }
+
+    function updateFishMovement() {
+        if (!gameActive) return;
+
+        // 二維彈性物理碰撞
+        for (let i = 0; i < fishData.length; i++) {
+            for (let j = i + 1; j < fishData.length; j++) {
+                let f1 = fishData[i];
+                let f2 = fishData[j];
+                
+                let dx = f2.x - f1.x;
+                let dy = f2.y - f1.y;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+                let minDist = f1.radius + f2.radius;
+
+                if (distance < minDist) {
+                    if (distance === 0) {
+                        dx = 1; dy = 0; distance = 1;
+                    }
+
+                    let overlap = minDist - distance;
+                    let nx = dx / distance;
+                    let ny = dy / distance;
+
+                    f1.x -= nx * overlap * 0.5;
+                    f1.y -= ny * overlap * 0.5;
+                    f2.x += nx * overlap * 0.5;
+                    f2.y += ny * overlap * 0.5;
+
+                    let kx = f1.speedX - f2.speedX;
+                    let ky = f1.speedY - f2.speedY;
+                    let p = nx * kx + ny * ky;
+
+                    if (p > 0) {
+                        f1.speedX -= nx * p;
+                        f1.speedY -= ny * p;
+                        f2.speedX += nx * p;
+                        f2.speedY += ny * p;
+                    }
+                }
+            }
+        }
+
+        // 移動更新與邊界回彈
+        fishData.forEach(fish => {
+            const minX = 1.2;
+            const minY = 0.2;
+            if (Math.abs(fish.speedX) < minX) fish.speedX = fish.speedX >= 0 ? minX : -minX;
+            if (Math.abs(fish.speedY) < minY) fish.speedY = fish.speedY >= 0 ? minY : -minY;
+
+            fish.x += fish.speedX;
+            fish.y += fish.speedY;
+
+            if (fish.x < 0) {
+                fish.x = 0; 
+                fish.speedX = Math.abs(fish.speedX); 
+            } else if (fish.x > 720) {
+                fish.x = 720; 
+                fish.speedX = -Math.abs(fish.speedX); 
+            }
+
+            if (fish.y < 110) {
+                fish.y = 110; 
+                fish.speedY = Math.abs(fish.speedY); 
+            } else if (fish.y > 420) {
+                fish.y = 420; 
+                fish.speedY = -Math.abs(fish.speedY); 
+            }
+
+            let dir = fish.speedX > 0 ? -1 : 1;
+            fish.el.style.setProperty('--dir', dir);
+            
+            fish.el.style.transform = `translate(${fish.x}px, ${fish.y}px)`;
+        });
+
+        requestAnimationFrame(updateFishMovement);
+    }
+
+    function startGame() {
+        score = 0;
+        currentRoundIndex = 0;
+        wrongAnswersLog = [];
+        questionQueue = [...pool].sort(() => 0.5 - Math.random());
+
+        document.getElementById('score').textContent = score;
+        document.getElementById('start-screen').classList.add('hide');
+        document.getElementById('game-over-screen').classList.add('hide');
+        gameActive = true;
+        
+        initFish();
+        requestAnimationFrame(updateFishMovement);
+        nextQuestion();
+    }
+
+    function nextQuestion() {
+        if (!gameActive) return;
+
+        if (currentRoundIndex >= questionQueue.length) {
+            endGame();
+            return;
+        }
+
+        clearInterval(timerInterval);
+        timeLeft = 10; // 每題時間初始化為 10 秒
+        document.getElementById('timer').textContent = timeLeft;
+        document.getElementById('progress').textContent = currentRoundIndex + 1;
+
+        currentCorrectAnswer = questionQueue[currentRoundIndex];
+        document.getElementById('pinyin-target').textContent = currentCorrectAnswer.py;
+
+        let filterPool = pool.filter(item => item.zh !== currentCorrectAnswer.zh);
+        let shuffledWrong = filterPool.sort(() => 0.5 - Math.random()).slice(0, 3);
+        let roundChoices = [...shuffledWrong, currentCorrectAnswer].sort(() => 0.5 - Math.random());
+
+        fishData.forEach((fish, i) => {
+            fish.word = roundChoices[i];
+            fish.el.querySelector('.fish-text').textContent = roundChoices[i].zh;
+            fish.speedX = (Math.random() * 0.6 + 1.2) * (fish.speedX > 0 ? 1 : -1);
+            fish.speedY = (Math.random() * 0.3 + 0.2) * (fish.speedY > 0 ? 1 : -1);
+        });
+
+        // 啟動 10 秒倒數
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').textContent = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                wrongAnswersLog.push({
+                    pinyin: currentCorrectAnswer.py,
+                    userPick: "Timeout",
+                    correct: currentCorrectAnswer.zh
+                });
+                showFeedback(false, "Time Out!");
+                currentRoundIndex++;
+                setTimeout(nextQuestion, 1200);
+            }
+        }, 1000);
+    }
+
+    fishElements.forEach((el, index) => {
+        el.addEventListener('click', () => {
+            if (!gameActive || timeLeft <= 0) return;
+
+            clearInterval(timerInterval);
+            let clickedFish = fishData[index];
+
+            if (clickedFish.word.zh === currentCorrectAnswer.zh) {
+                score += 10;
+                document.getElementById('score').textContent = score;
+                showFeedback(true, "Excellent!");
+            } else {
+                wrongAnswersLog.push({
+                    pinyin: currentCorrectAnswer.py,
+                    userPick: clickedFish.word.zh,
+                    correct: currentCorrectAnswer.zh
+                });
+                showFeedback(false, "Wrong!");
+            }
+
+            currentRoundIndex++;
+            setTimeout(nextQuestion, 1200);
+        });
+    });
+
+    function showFeedback(isCorrect, text) {
+        const fb = document.getElementById('feedback');
+        fb.textContent = text;
+        fb.className = isCorrect ? 'correct' : 'wrong';
+        fb.style.opacity = '1';
+        setTimeout(() => {
+            fb.style.opacity = '0';
+        }, 800);
+    }
+
+    function endGame() {
+        gameActive = false;
+        clearInterval(timerInterval);
+        document.getElementById('final-score').textContent = score;
+        
+        const reviewContainer = document.getElementById('review-container');
+        reviewContainer.innerHTML = "";
+
+        if (wrongAnswersLog.length === 0) {
+            reviewContainer.innerHTML = `<div style="text-align:center; color:#b9f6ca; padding:15px; font-size:18px;">🏆 Perfect! You got all Pinyin correct!</div>`;
+        } else {
+            wrongAnswersLog.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'review-item';
+                row.innerHTML = `
+                    <span>🔍 Pinyin: <strong>${item.pinyin}</strong></span>
+                    <span>Your Pick: <span class="txt-wrong">${item.userPick}</span></span>
+                    <span>Correct: <span class="txt-correct">${item.correct}</span></span>
+                `;
+                reviewContainer.appendChild(row);
+            });
+        }
+
+        document.getElementById('game-over-screen').classList.remove('hide');
+    }
+</script>
+
+</body>
+</html>
