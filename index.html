@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -192,24 +191,40 @@
         .fish-fin-top {
             position: absolute;
             top: 13px; 
-            left: 45px;
             width: 55px;
             height: 15px;
             border-radius: 50% 50% 0 0 / 100% 100% 0 0;
             background: var(--fish-color);
             z-index: 4;
+            transition: transform 0.2s, left 0.2s;
+        }
+        .fish[style*="--dir: 1"] .fish-fin-top {
+            transform: scaleX(-1);
+            left: 45px; 
+        }
+        .fish[style*="--dir: -1"] .fish-fin-top {
+            transform: scaleX(1);
+            left: 65px;
         }
 
         /* 腹鰭 */
         .fish-fin-bottom {
             position: absolute;
             bottom: 13px; 
-            left: 50px;
             width: 45px;
             height: 12px;
             border-radius: 0 0 50% 50% / 0 0 100% 100%;
             background: var(--fish-color);
             z-index: 4;
+            transition: transform 0.2s, left 0.2s;
+        }
+        .fish[style*="--dir: 1"] .fish-fin-bottom {
+            transform: scaleX(-1);
+            left: 50px;
+        }
+        .fish[style*="--dir: -1"] .fish-fin-bottom {
+            transform: scaleX(1);
+            left: 70px;
         }
 
         /* 色彩設定 */
@@ -321,7 +336,7 @@
             <div id="pinyin-target">-</div>
         </div>
         <div id="stats-box">
-            <div>Timer: <span id="timer">8</span>s</div>
+            <div>Timer: <span id="timer">10</span>s</div>
             <div>Score: <span id="score">0</span></div>
         </div>
     </div>
@@ -363,7 +378,7 @@
 
     <div id="start-screen">
         <h1 style="color: #4fc3f7; margin-bottom: 10px;">Pinyin Fishing Game</h1>
-        <p style="font-size: 18px; margin-bottom: 30px; color: #e0f7fa;">Test all 14 words! 8 seconds per round. Keep going until the end!</p>
+        <p style="font-size: 18px; margin-bottom: 30px; color: #e0f7fa;">Test all 14 words! 10 seconds per round. Keep going until the end!</p>
         <button onclick="startGame()">Start Game</button>
     </div>
 
@@ -397,7 +412,7 @@
     ];
 
     let score = 0;
-    let timeLeft = 8;
+    let timeLeft = 10; // 修改為 10 秒
     let timerInterval;
     let gameActive = false;
     let currentCorrectAnswer = null;
@@ -416,16 +431,13 @@
 
     function initFish() {
         fishData = fishElements.map((el) => {
-            // 初始化確定的速度，不為 0
-            let speedX = (Math.random() * 0.8 + 1.2) * (Math.random() > 0.5 ? 1 : -1);
-            let speedY = (Math.random() * 0.3 + 0.2) * (Math.random() > 0.5 ? 1 : -1);
             return {
                 el: el,
                 x: Math.random() * 650,
                 y: 130 + Math.random() * 260,
-                speedX: speedX,
-                speedY: speedY,
-                radius: 70, // 稍微縮小碰撞計算半徑，讓游動空間更自然
+                speedX: (Math.random() * 0.6 + 1.2) * (Math.random() > 0.5 ? 1 : -1),
+                speedY: (Math.random() * 0.3 + 0.2) * (Math.random() > 0.5 ? 1 : -1),
+                radius: 65,
                 word: ""
             };
         });
@@ -434,7 +446,7 @@
     function updateFishMovement() {
         if (!gameActive) return;
 
-        // 1. 魚隻之間的防重疊與反彈計算
+        // 二維彈性物理碰撞
         for (let i = 0; i < fishData.length; i++) {
             for (let j = i + 1; j < fishData.length; j++) {
                 let f1 = fishData[i];
@@ -446,68 +458,62 @@
                 let minDist = f1.radius + f2.radius;
 
                 if (distance < minDist) {
-                    if (distance === 0) distance = 0.1; // 防止除以 0
+                    if (distance === 0) {
+                        dx = 1; dy = 0; distance = 1;
+                    }
 
                     let overlap = minDist - distance;
-                    let forceX = (dx / distance) * overlap * 0.5;
-                    let forceY = (dy / distance) * overlap * 0.5;
+                    let nx = dx / distance;
+                    let ny = dy / distance;
 
-                    // 立即推開分離，防止卡死
-                    f1.x -= forceX;
-                    f1.y -= forceY;
-                    f2.x += forceX;
-                    f2.y += forceY;
+                    f1.x -= nx * overlap * 0.5;
+                    f1.y -= ny * overlap * 0.5;
+                    f2.x += nx * overlap * 0.5;
+                    f2.y += ny * overlap * 0.5;
 
-                    // 彈開時的速度交換與反轉
-                    let tempX = f1.speedX;
-                    let tempY = f1.speedY;
-                    f1.speedX = -f2.speedX;
-                    f1.speedY = -f2.speedY;
-                    f2.speedX = -tempX;
-                    f2.speedY = -tempY;
+                    let kx = f1.speedX - f2.speedX;
+                    let ky = f1.speedY - f2.speedY;
+                    let p = nx * kx + ny * ky;
+
+                    if (p > 0) {
+                        f1.speedX -= nx * p;
+                        f1.speedY -= ny * p;
+                        f2.speedX += nx * p;
+                        f2.speedY += ny * p;
+                    }
                 }
             }
         }
 
-        // 2. 邊界檢查與最低游動速度限制（核心修正點！）
+        // 移動更新與邊界回彈
         fishData.forEach(fish => {
-            // 強制檢查並限制最低游動速度，防止碰撞後靜止不游
-            const minSpeedX = 1.0;
-            const minSpeedY = 0.2;
-
-            if (Math.abs(fish.speedX) < minSpeedX) {
-                fish.speedX = fish.speedX >= 0 ? minSpeedX : -minSpeedX;
-            }
-            if (Math.abs(fish.speedY) < minSpeedY) {
-                fish.speedY = fish.speedY >= 0 ? minSpeedY : -minSpeedY;
-            }
+            const minX = 1.2;
+            const minY = 0.2;
+            if (Math.abs(fish.speedX) < minX) fish.speedX = fish.speedX >= 0 ? minX : -minX;
+            if (Math.abs(fish.speedY) < minY) fish.speedY = fish.speedY >= 0 ? minY : -minY;
 
             fish.x += fish.speedX;
             fish.y += fish.speedY;
 
-            // 左右邊界反彈
             if (fish.x < 0) {
-                fish.x = 0;
-                fish.speedX = Math.abs(fish.speedX);
+                fish.x = 0; 
+                fish.speedX = Math.abs(fish.speedX); 
             } else if (fish.x > 720) {
-                fish.x = 720;
-                fish.speedX = -Math.abs(fish.speedX);
+                fish.x = 720; 
+                fish.speedX = -Math.abs(fish.speedX); 
             }
 
-            // 上下邊界反彈
             if (fish.y < 110) {
-                fish.y = 110;
-                fish.speedY = Math.abs(fish.speedY);
+                fish.y = 110; 
+                fish.speedY = Math.abs(fish.speedY); 
             } else if (fish.y > 420) {
-                fish.y = 420;
-                fish.speedY = -Math.abs(fish.speedY);
+                fish.y = 420; 
+                fish.speedY = -Math.abs(fish.speedY); 
             }
 
-            // 設定朝向變數（speedX 負值向左(1)，正值向右(-1)）
             let dir = fish.speedX > 0 ? -1 : 1;
             fish.el.style.setProperty('--dir', dir);
             
-            // 渲染位置
             fish.el.style.transform = `translate(${fish.x}px, ${fish.y}px)`;
         });
 
@@ -539,7 +545,7 @@
         }
 
         clearInterval(timerInterval);
-        timeLeft = 8;
+        timeLeft = 10; // 每題時間初始化為 10 秒
         document.getElementById('timer').textContent = timeLeft;
         document.getElementById('progress').textContent = currentRoundIndex + 1;
 
@@ -553,11 +559,11 @@
         fishData.forEach((fish, i) => {
             fish.word = roundChoices[i];
             fish.el.querySelector('.fish-text').textContent = roundChoices[i].zh;
-            // 換題時給予微調動力，讓游動感更具隨機變化
-            fish.speedX = (Math.random() * 0.8 + 1.2) * (fish.speedX > 0 ? 1 : -1);
+            fish.speedX = (Math.random() * 0.6 + 1.2) * (fish.speedX > 0 ? 1 : -1);
             fish.speedY = (Math.random() * 0.3 + 0.2) * (fish.speedY > 0 ? 1 : -1);
         });
 
+        // 啟動 10 秒倒數
         timerInterval = setInterval(() => {
             timeLeft--;
             document.getElementById('timer').textContent = timeLeft;
